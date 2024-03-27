@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>
+    <%= title %>
+  </title>
+  <link rel='stylesheet' href='/stylesheets/style.css' />
+</head>
+
+<body>
+  <% for (const key in data) { %>
+    <%= data[key] %>
+      <% for (const key1 in data[key]) { %>
+        <%= data[key][key1] %>
+        <% } %>
+          <% } %>
+</body>
+
+</html>

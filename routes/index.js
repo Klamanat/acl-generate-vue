@@ -8,11 +8,28 @@ const regex_service = /(import {? \w.*-service')/g
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
+  let data = []
   readDirectory(directoryPath).then((fileList) => {
-    getImportService(fileList).then((data) => {
-      console.log('data: ', groupBy(data, 'fileName'))
-      res.render('index', { title: 'ACL Generate', data: groupBy(data, 'fileName') })
-    })
+    console.log(fileList)
+    fileList.forEach((file) => {
+      if (file.indexOf('component.vue') !== -1) {
+        // find program component only.
+        getImportService(file, directoryPath).then(result => {
+          data.push(...result)
+        })
+      } else if (file.indexOf('.vue') === -1) {
+        // find in folder.
+        const _directory = directoryPath + '/' + file
+        getSubImportService(file, _directory).then(result => {
+          data.push(...result)
+        })
+      }
+    });
+
+    setTimeout(() => {
+      console.log(groupBy(data, 'folder'))
+      res.render('index', { title: 'ACL Generate', data: groupBy(data, 'folder') })
+    }, 500)
   })
 });
 
@@ -23,48 +40,71 @@ const groupBy = function (xs, key) {
   }, {});
 };
 
-// get service object.
-const getImportService = (fileList, directory = directoryPath) => {
+const getSubImportService = (folder, directory) => {
   let content = []
-  return new Promise((resolve, reject) => {
-    let index = 1
-    fileList.forEach((file) => {
-      // find program component only.
-      if (file.indexOf('component.vue') !== -1) {
-        readFile(directory + '/' + file).then((result) => {
-          const match = result.match(regex_service)
 
-          if (match && match.length > 0) {
-            // convert to object and groupBy fileName.
-            content = [...content, ...convertServiceToObject(match, file, result)]
+  return new Promise((resolve) => {
+    readDirectory(directory).then((fileList) => {
+      fileList.forEach((file, index) => {
+        if (file.indexOf('component.vue') !== -1) {
+          getImportService(file, directory, folder).then(c => {
+            content = [...content, ...c]
 
             if (index === fileList.length - 1)
               resolve(content)
-
-            index++
-          }
-        })
-      } else {
-        // find in folder.
-        if (file.indexOf('.vue') === -1) {
+          })
+        } else if (file.indexOf('.vue') === -1) {
+          // find in folder.
           const _directory = directory + '/' + file
-          // console.log('directory: ', _directory)
-          readDirectory(_directory).then((fileList) => {
-            getImportService(fileList, _directory).then((data) => {
-              content = [...content, ...data]
+          getSubImportService_1(folder, _directory).then(c => {
+            content = [...content, ...c]
 
-              resolve(content)
-            })
+            resolve(content)
           })
         }
-      }
-    });
+      })
+    })
+  })
+}
 
+const getSubImportService_1 = (folder, directory) => {
+  let content = []
+
+  return new Promise((resolve) => {
+    readDirectory(directory).then((fileList) => {
+      fileList.forEach((file, index) => {
+        if (file.indexOf('component.vue') !== -1) {
+          getImportService(file, directory, folder).then(c => {
+            content = [...content, ...c]
+
+            if (index === fileList.length - 1)
+              resolve(content)
+          })
+        }
+      })
+    })
+  })
+}
+
+// get service object.
+const getImportService = (file, directory = directoryPath, folder) => {
+  let content = []
+  return new Promise((resolve) => {
+    readFile(directory + '/' + file).then((result) => {
+      const match = result ? result.match(regex_service) : null
+
+      if (match && match.length > 0) {
+        // convert to object and groupBy fileName.
+        content = [...content, ...convertServiceToObject(match, file, result, folder)]
+
+        resolve(content)
+      }
+    })
   })
 }
 
 // build struct service.
-const convertServiceToObject = (list, fileName, content) => {
+const convertServiceToObject = (list, fileName, content, folder) => {
   let result = []
   list.forEach(obj => {
     const serviceList = obj.substring(obj.indexOf('{') + 1, obj.indexOf('}')).split(', ')
@@ -84,7 +124,7 @@ const convertServiceToObject = (list, fileName, content) => {
         serviceName = match1 ? match1.map(m => m.replace(regexRm, '')) : []
       }
 
-      result.push({ service: s, path, fileName, serviceName: serviceName.join(', ') })
+      result.push({ folder, service: s, path, fileName, serviceName: serviceName.join(', ') })
     })
 
   })
@@ -104,7 +144,7 @@ const readFile = async (path) => {
   return new Promise((resolve, reject) => {
     fs.readFile(path, 'utf8', (err, data) => {
       if (err) {
-        console.log(err);
+        resolve(null);
       }
 
       resolve(data)
@@ -116,7 +156,7 @@ const readDirectory = async (path) => {
   return new Promise((resolve, reject) => {
     fs.readdir(path, (err, files) => {
       if (err) {
-        console.log('Error reading directory:', err);
+        resolve(null);
       }
 
       resolve(files);

@@ -3,13 +3,12 @@ var router = express.Router();
 const { readDirectory } = require('../utils/file')
 const { getImportService, getSubImportService, groupBy } = require('../utils/common');
 
-const directoryPath = 'D:/ELAAS/elaas/src/views/common/expense'
+const directoryPath = 'D:/ELAAS/elaas/src/views/app/account'
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
   let data = []
   readDirectory(directoryPath).then((fileList) => {
-    console.log(fileList)
     fileList.forEach((file) => {
       if (file.indexOf('component.vue') !== -1) {
         // find program component only.

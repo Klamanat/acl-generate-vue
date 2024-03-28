@@ -1,6 +1,8 @@
 
 const { readDirectory, readFile } = require('../utils/file');
-const regex_service = /(import {? \w.*-service')/g
+
+const regex_service = /(import {? \w.*(-service|aim)')/g;
+const base_url = 'D:/ELAAS/elaas/src/'
 
 const groupBy = function (xs, key) {
     return xs.reduce(function (rv, x) {
@@ -18,8 +20,6 @@ const getSubImportService = (folder, directory) => {
                 resolve([])
                 return false
             }
-
-            console.log(fileList)
 
             fileList.forEach((file, index) => {
                 if (file.indexOf('component.vue') !== -1) {
@@ -84,7 +84,7 @@ const convertServiceToObject = (list, fileName, content, folder) => {
     let result = []
     list.forEach(obj => {
         const serviceList = obj.substring(obj.indexOf('{') + 1, obj.indexOf('}')).split(', ')
-        const path = obj.substring(obj.indexOf('\'')).replace(/\'/g, '')
+        const path = obj.substring(obj.indexOf('\'')).replace(/\'/g, '').replace('@/', base_url)
 
         serviceList.forEach(service => {
             let serviceName = []
@@ -100,7 +100,11 @@ const convertServiceToObject = (list, fileName, content, folder) => {
                 serviceName = match1 ? match1.map(m => m.replace(regexRm, '')) : []
             }
 
-            result.push({ folder: folder.toUpperCase(), service: s, path, fileName, serviceName: serviceName.join(', ') })
+            const obj = { folder: folder.toUpperCase(), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
+
+            getServiceUrl(obj)
+
+            result.push(obj)
         })
 
     })
@@ -108,6 +112,26 @@ const convertServiceToObject = (list, fileName, content, folder) => {
 }
 
 const getServiceVariable = (str) => str.substring(str.indexOf('const') + 6, str.indexOf('=') - 1)
+
+const underScoreCase = (str) => str.replace(/\.?([A-Z])/g, function (x, y) { return "_" + y.toLowerCase() }).replace(/^_/, "")
+
+const getServiceUrl = (obj) => {
+    const { path, serviceNames, service } = obj
+    const fileName = underScoreCase(service).replace(/_/g, '-').replace('-service', '')
+    const folderName = path.substring(path.lastIndexOf('/') + 1)
+    const _fileName = fileName.replace(folderName.replace('-service', '') + '-', '')
+
+    const _path = `/api/${folderName === 'aim' ? folderName + '-service' : folderName}/${_fileName}`
+    const _serviceNames = []
+
+    serviceNames.forEach(s => {
+        _serviceNames.push(_path + '/' + underScoreCase(s).replace(/_/g, '-'))
+    })
+
+    obj.serviceName = _serviceNames.join(' , ')
+
+    return obj
+}
 
 module.exports = {
     groupBy,

@@ -2,6 +2,7 @@
 const { readDirectory, readFile } = require('../utils/file');
 
 const regex_service = /(import {? \w.*(-service|.service|aim|common|-report)')/g;
+const regex_component = /from '((.|@\/)+vue)'/g;
 const base_url = 'D:/ELAAS/elaas/src/'
 
 const groupBy = function (xs, key) {
@@ -42,16 +43,51 @@ const getSubImportService = (folder, directory) => {
                             matchFiles.forEach((mf, index1) => {
                                 const mFile = (mf || '').replace(/(componentName|dropdownComponentName):/g, '').replace(/\'/g, '').replace(/,/g, '').replace(' ', '')
                                 const mPath = (matchPaths[index1] || '').replace(/(componentPath|dropdownComponentPath):/g, '').replace(/\'/g, '').replace(/,/g, '').replace(' ', '')
+                                const directoryView = base_url + 'views/' + mPath;
+                                const _mFile = mFile + '.vue';
 
-
-                                getImportService(mFile + '.vue', base_url + '/views/' + mPath, folder).then(result => {
+                                getImportService(_mFile, directoryView, folder).then(result => {
                                     content = [...content, ...result]
 
                                     if (index1 === matchFiles.length - 1) {
-                                        getImportService(file, directory, folder).then(result1 => {
-                                            content = [...content, ...result1]
+                                        readFile(directoryView + '/' + _mFile).then((result1) => {
+                                            const matchComponent = result1 ? result1.match(regex_component) : null;
 
-                                            resolve(filterUrl(content))
+                                            if (matchComponent) {
+                                                matchComponent.forEach((mComponent, index2) => {
+                                                    let pathComponent = mComponent.substring(mComponent.indexOf('\''), mComponent.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
+                                                    const componentFile = pathComponent.substring(pathComponent.lastIndexOf('/') + 1)
+
+                                                    if (pathComponent.match(/@/)) {
+                                                        pathComponent = pathComponent.replace('@/', base_url)
+                                                    } else {
+                                                        pathComponent = directory + '/' + pathComponent
+                                                    }
+
+                                                    pathComponent = pathComponent.substring(0, pathComponent.lastIndexOf('/'))
+
+                                                    // read from component level1.
+                                                    getImportService(componentFile, pathComponent, folder).then(result2 => {
+                                                        content = [...content, ...result2]
+
+                                                        if (index2 === matchComponent.length - 1) {
+                                                            // read from IndexView.vue
+                                                            getImportService(file, directory, folder).then(result3 => {
+                                                                content = [...content, ...result3]
+
+                                                                resolve(filterUrl(content))
+                                                            })
+                                                        }
+                                                    })
+                                                })
+                                            } else {
+                                                // read from IndexView.vue
+                                                getImportService(file, directory, folder).then(result3 => {
+                                                    content = [...content, ...result3]
+
+                                                    resolve(filterUrl(content))
+                                                })
+                                            }
                                         })
                                     }
                                 })
@@ -104,7 +140,7 @@ const getImportService = (file, directory = directoryPath, folder) => {
     let content = []
     return new Promise((resolve) => {
         readFile(directory + '/' + file).then((result) => {
-            const match = result ? result.match(regex_service) : null
+            const match = result ? result.match(regex_service) : null;
 
             if (match && match.length > 0) {
                 // convert to object and groupBy fileName.

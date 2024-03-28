@@ -1,7 +1,7 @@
 
 const { readDirectory, readFile } = require('../utils/file');
 
-const regex_service = /(import {? \w.*(-service|aim)')/g;
+const regex_service = /(import {? \w.*(-service|.service|aim|common|-report)')/g;
 const base_url = 'D:/ELAAS/elaas/src/'
 
 const groupBy = function (xs, key) {
@@ -10,6 +10,8 @@ const groupBy = function (xs, key) {
         return rv;
     }, {});
 };
+
+const filterUrl = (content) => content.filter(f => f.url)
 
 const getSubImportService = (folder, directory) => {
     let content = []
@@ -22,12 +24,47 @@ const getSubImportService = (folder, directory) => {
             }
 
             fileList.forEach((file, index) => {
-                if (file.indexOf('component.vue') !== -1) {
+                if (file === 'IndexView.vue') {
+                    readFile(directory + '/' + file).then((result) => {
+                        const regexFile = /(componentName|dropdownComponentName): '(.*?)'/g
+                        const regexPath = /(componentPath|dropdownComponentPath): '(.*?)'/g
+
+                        const matchFiles = result.match(regexFile)
+                        const matchPaths = result.match(regexPath)
+
+                        if (!matchFiles) {
+                            getImportService(file, directory, folder).then(result1 => {
+                                content = [...content, ...result1]
+
+                                resolve(filterUrl(content))
+                            })
+                        } else {
+                            matchFiles.forEach((mf, index1) => {
+                                const mFile = (mf || '').replace(/(componentName|dropdownComponentName):/g, '').replace(/\'/g, '').replace(/,/g, '').replace(' ', '')
+                                const mPath = (matchPaths[index1] || '').replace(/(componentPath|dropdownComponentPath):/g, '').replace(/\'/g, '').replace(/,/g, '').replace(' ', '')
+
+
+                                getImportService(mFile + '.vue', base_url + '/views/' + mPath, folder).then(result => {
+                                    content = [...content, ...result]
+
+                                    if (index1 === matchFiles.length - 1) {
+                                        getImportService(file, directory, folder).then(result1 => {
+                                            content = [...content, ...result1]
+
+                                            resolve(filterUrl(content))
+                                        })
+                                    }
+                                })
+                            })
+                        }
+
+                    })
+                } else if (file.indexOf('.vue') !== -1) {
                     getImportService(file, directory, folder).then(c => {
                         content = [...content, ...c]
 
                         if (index === fileList.length - 1)
-                            resolve(content)
+                            resolve(filterUrl(content))
                     })
                 } else if (file.indexOf('.vue') === -1) {
                     // find in folder.
@@ -35,7 +72,7 @@ const getSubImportService = (folder, directory) => {
                     getSubImportService_1(folder, _directory).then(c => {
                         content = [...content, ...c]
 
-                        resolve(content)
+                        resolve(filterUrl(content))
                     })
                 }
             })
@@ -49,12 +86,12 @@ const getSubImportService_1 = (folder, directory) => {
     return new Promise((resolve) => {
         readDirectory(directory).then((fileList) => {
             fileList.forEach((file, index) => {
-                if (file.indexOf('component.vue') !== -1) {
+                if (file.indexOf('.vue') !== -1) {
                     getImportService(file, directory, folder).then(c => {
                         content = [...content, ...c]
 
                         if (index === fileList.length - 1)
-                            resolve(content)
+                            resolve(filterUrl(content))
                     })
                 }
             })
@@ -73,7 +110,9 @@ const getImportService = (file, directory = directoryPath, folder) => {
                 // convert to object and groupBy fileName.
                 content = [...content, ...convertServiceToObject(match, file, result, folder)]
 
-                resolve(content)
+                resolve(filterUrl(content))
+            } else {
+                resolve(filterUrl(content))
             }
         })
     })
@@ -97,18 +136,23 @@ const convertServiceToObject = (list, fileName, content, folder) => {
                 const regex1 = new RegExp('(' + sName + '.\\w+)', 'g')
                 const regexRm = new RegExp(sName + '.', 'g')
                 const match1 = content.match(regex1)
-                serviceName = match1 ? match1.map(m => m.replace(regexRm, '')) : []
+                serviceName = match1 ? removeDuplicates(match1).map(m => m.replace(regexRm, '')) : [];
             }
 
-            const obj = { folder: folder.toUpperCase(), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
+            const obj = { folder: (folder || ''), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
 
             getServiceUrl(obj)
 
-            result.push(obj)
+            result.push({ folder: obj.folder, url: obj.serviceName, fileName: obj.fileName })
         })
 
     })
     return result
+}
+
+const removeDuplicates = (arr) => {
+    return arr.filter((item,
+        index) => arr.indexOf(item) === index);
 }
 
 const getServiceVariable = (str) => str.substring(str.indexOf('const') + 6, str.indexOf('=') - 1)
@@ -125,7 +169,8 @@ const getServiceUrl = (obj) => {
     const _serviceNames = []
 
     serviceNames.forEach(s => {
-        _serviceNames.push(_path + '/' + underScoreCase(s).replace(/_/g, '-'))
+        if (folderName !== 'date.service')
+            _serviceNames.push(_path + '/' + underScoreCase(s).replace(/_/g, '-'))
     })
 
     obj.serviceName = _serviceNames.join(' , ')

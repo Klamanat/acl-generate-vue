@@ -71,11 +71,44 @@ const getSubImportService = (folder, directory) => {
                                                         content = [...content, ...result2]
 
                                                         if (index2 === matchComponent.length - 1) {
-                                                            // read from IndexView.vue
-                                                            getImportService(file, directory, folder).then(result3 => {
-                                                                content = [...content, ...result3]
+                                                            readFile(pathComponent + '/' + componentFile).then((result3) => {
+                                                                const matchComponent1 = result3 ? result3.match(regex_component) : null;
 
-                                                                resolve(filterUrl(content))
+                                                                if (matchComponent1) {
+                                                                    matchComponent1.forEach((mComponent1, index3) => {
+                                                                        let pathComponent1 = mComponent1.substring(mComponent1.indexOf('\''), mComponent1.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
+                                                                        const componentFile1 = pathComponent1.substring(pathComponent1.lastIndexOf('/') + 1)
+
+                                                                        if (pathComponent1.match(/@/)) {
+                                                                            pathComponent1 = pathComponent1.replace('@/', base_url)
+                                                                        } else {
+                                                                            pathComponent1 = directory + '/' + pathComponent1
+                                                                        }
+
+                                                                        pathComponent1 = pathComponent1.substring(0, pathComponent1.lastIndexOf('/'))
+
+                                                                        // read from component level2.
+                                                                        getImportService(componentFile1, pathComponent1, folder).then(result4 => {
+                                                                            content = [...content, ...result4]
+
+                                                                            if (index3 === matchComponent1.length - 1) {
+                                                                                // read from IndexView.vue
+                                                                                getImportService(file, directory, folder).then(result5 => {
+                                                                                    content = [...content, ...result5]
+
+                                                                                    resolve(filterUrl(content))
+                                                                                })
+                                                                            }
+                                                                        })
+                                                                    })
+                                                                } else {
+                                                                    // read from IndexView.vue
+                                                                    getImportService(file, directory, folder).then(result4 => {
+                                                                        content = [...content, ...result4]
+
+                                                                        resolve(filterUrl(content))
+                                                                    })
+                                                                }
                                                             })
                                                         }
                                                     })

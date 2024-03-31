@@ -1,7 +1,7 @@
 
 const { readDirectory, readFile } = require('../utils/file');
 
-const regex_service = /(import {? \w.*(-service|.service|aim|common|-report)')/g;
+const regex_service = /import {? \w.*(-(service|report|master|support)|\.service|aim|budget|common|receive|provider)'/g;
 const regex_component = /from '((.|@\/)+vue)'/g;
 const base_url = 'D:/ELAAS/elaas/src/'
 
@@ -50,6 +50,8 @@ const getSubImportService = (folder, directory) => {
                                     content = [...content, ...result]
 
                                     if (index1 === matchFiles.length - 1) {
+                                        if (content.filter(f => f.folder === 'expense005'))
+                                            console.log('result: ', content.filter(f => f.folder === 'expense005'))
                                         readFile(directoryView + '/' + _mFile).then((result1) => {
                                             const matchComponent = result1 ? result1.match(regex_component) : null;
 
@@ -73,6 +75,9 @@ const getSubImportService = (folder, directory) => {
                                                         if (index2 === matchComponent.length - 1) {
                                                             readFile(pathComponent + '/' + componentFile).then((result3) => {
                                                                 const matchComponent1 = result3 ? result3.match(regex_component) : null;
+
+                                                                if (folder === 'expense005')
+                                                                    console.log('matchComponent1: ', matchComponent1)
 
                                                                 if (matchComponent1) {
                                                                     matchComponent1.forEach((mComponent1, index3) => {
@@ -177,9 +182,11 @@ const getImportService = (file, directory = directoryPath, folder) => {
 
             if (match && match.length > 0) {
                 // convert to object and groupBy fileName.
-                content = [...content, ...convertServiceToObject(match, file, result, folder)]
-
-                resolve(filterUrl(content))
+                convertServiceToObject(match, file, result, folder).then(list => {
+                    content = [...content, ...list];
+                    
+                    resolve(filterUrl(content))
+                })
             } else {
                 resolve(filterUrl(content))
             }
@@ -190,33 +197,39 @@ const getImportService = (file, directory = directoryPath, folder) => {
 // build struct service.
 const convertServiceToObject = (list, fileName, content, folder) => {
     let result = []
-    list.forEach(obj => {
-        const serviceList = obj.substring(obj.indexOf('{') + 1, obj.indexOf('}')).split(', ')
-        const path = obj.substring(obj.indexOf('\'')).replace(/\'/g, '').replace('@/', base_url)
 
-        serviceList.forEach(service => {
-            let serviceName = []
-            const s = service.replace(/ /g, '')
-            const regex = new RegExp('const \\w+ = new ' + s, 'g')
-            const match = content.match(regex)
+    return new Promise((resolve) => {
+        list.forEach((obj, index) => {
+            const serviceList = obj.substring(obj.indexOf('{') + 1, obj.indexOf('}')).split(', ')
+            const path = obj.substring(obj.indexOf('\'')).replace(/\'/g, '').replace('@/', base_url)
 
-            if (match && match.length > 0) {
-                const sName = getServiceVariable(match[0]).replace(/ /g, '')
-                const regex1 = new RegExp('(' + sName + '.\\w+)', 'g')
-                const regexRm = new RegExp(sName + '.', 'g')
-                const match1 = content.match(regex1)
-                serviceName = match1 ? removeDuplicates(match1).map(m => m.replace(regexRm, '')) : [];
-            }
+            serviceList.forEach(service => {
+                let serviceName = []
+                const s = service.replace(/ /g, '')
+                const regex = new RegExp('const \\w+ = new ' + s, 'g')
+                const match = content.match(regex)
 
-            const obj = { folder: (folder || ''), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
+                if (match && match.length > 0) {
+                    const sName = getServiceVariable(match[0]).replace(/ /g, '')
+                    const regex1 = new RegExp('(' + sName + '.\\w+)', 'g')
+                    const regexRm = new RegExp(sName + '.', 'g')
+                    const match1 = content.match(regex1)
+                    serviceName = match1 ? removeDuplicates(match1).map(m => m.replace(regexRm, '')) : [];
+                }
 
-            getServiceUrl(obj)
+                const obj = { folder: (folder || ''), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
 
-            result.push({ folder: obj.folder, url: obj.serviceName, fileName: obj.fileName })
+                getServiceUrl(obj).then((data) => {
+                    result.push({ folder: data.folder, url: data.serviceName, fileName: data.fileName })
+
+                    if (index === list.length - 1) {
+                        resolve(result)
+                    }
+                })
+            })
+
         })
-
     })
-    return result
 }
 
 const removeDuplicates = (arr) => {
@@ -229,22 +242,47 @@ const getServiceVariable = (str) => str.substring(str.indexOf('const') + 6, str.
 const underScoreCase = (str) => str.replace(/\.?([A-Z])/g, function (x, y) { return "_" + y.toLowerCase() }).replace(/^_/, "")
 
 const getServiceUrl = (obj) => {
-    const { path, serviceNames, service } = obj
-    const fileName = underScoreCase(service).replace(/_/g, '-').replace('-service', '')
-    const folderName = path.substring(path.lastIndexOf('/') + 1)
-    const _fileName = fileName.replace(folderName.replace('-service', '') + '-', '')
+    return new Promise((resolve) => {
+        const { path, serviceNames, service } = obj
+        const fileName = underScoreCase(service).replace(/_/g, '-').replace('-service', '')
+        let folderName = path.substring(path.lastIndexOf('/') + 1)
 
-    const _path = `/api/${folderName === 'aim' ? folderName + '-service' : folderName}/${_fileName}`
-    const _serviceNames = []
+        if (path.indexOf('.service') !== -1) {
+            const list = path.split('/')
+            list.pop()
+            obj.path = list.join('/')
+            folderName = list[list.length - 1]
+        }
 
-    serviceNames.forEach(s => {
-        if (folderName !== 'date.service')
-            _serviceNames.push(_path + '/' + underScoreCase(s).replace(/_/g, '-'))
+        const _fileName = fileName.replace(folderName.replace('-service', '') + '-', '')
+        const _path = `/api/${folderName === 'aim' ? folderName + '-service' : folderName}/${_fileName}`
+        const _serviceNames = [];
+
+
+        readFile((obj.path + '/' + fileName.replace(folderName.replace('-service', ''), folderName)) + '.service.ts').then((result) => {
+
+            serviceNames.forEach((s, index) => {
+                if (folderName !== 'date') {
+                    const regex = new RegExp('public ' + s + '(.*\\s*.*\\s*.*`)')
+
+                    const match = result ? result.match(regex) : []
+
+                    if (match && match.length > 0) {
+                        const url = match[0]
+                        const urlName = url.substring(url.indexOf('/') + 1, url.lastIndexOf('`'))
+
+                        _serviceNames.push(_path + '/' + urlName.replace(/(\?).*/g, ''))
+                    }
+
+                    if (index === serviceNames.length - 1) {
+                        obj.serviceName = _serviceNames.join(' , ')
+
+                        resolve(obj)
+                    }
+                }
+            })
+        })
     })
-
-    obj.serviceName = _serviceNames.join(' , ')
-
-    return obj
 }
 
 module.exports = {

@@ -47,87 +47,84 @@ const getSubImportService = (folder, directory) => {
                                 const _mFile = mFile + '.vue';
 
                                 getImportService(_mFile, directoryView, folder).then(result => {
-                                    content = [...content, ...result]
+                                    content = removeDuplicates([...content, ...result]);
 
-                                    if (index1 === matchFiles.length - 1) {
-                                        if (content.filter(f => f.folder === 'expense005'))
-                                            console.log('result: ', content.filter(f => f.folder === 'expense005'))
-                                        readFile(directoryView + '/' + _mFile).then((result1) => {
-                                            const matchComponent = result1 ? result1.match(regex_component) : null;
+                                    readFile(directoryView + '/' + _mFile).then((result1) => {
+                                        const matchComponent = result1 ? result1.match(regex_component) : null;
 
-                                            if (matchComponent) {
-                                                matchComponent.forEach((mComponent, index2) => {
-                                                    let pathComponent = mComponent.substring(mComponent.indexOf('\''), mComponent.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
-                                                    const componentFile = pathComponent.substring(pathComponent.lastIndexOf('/') + 1)
+                                        if (matchComponent) {
+                                            matchComponent.forEach((mComponent, index2) => {
+                                                let pathComponent = mComponent.substring(mComponent.indexOf('\''), mComponent.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
+                                                const componentFile = pathComponent.substring(pathComponent.lastIndexOf('/') + 1)
 
-                                                    if (pathComponent.match(/@/)) {
-                                                        pathComponent = pathComponent.replace('@/', base_url)
-                                                    } else {
-                                                        pathComponent = directory + '/' + pathComponent
-                                                    }
+                                                if (pathComponent.match(/@/)) {
+                                                    pathComponent = pathComponent.replace('@/', base_url)
+                                                } else {
+                                                    pathComponent = directory + '/' + pathComponent
+                                                }
 
-                                                    pathComponent = pathComponent.substring(0, pathComponent.lastIndexOf('/'))
+                                                pathComponent = pathComponent.substring(0, pathComponent.lastIndexOf('/'))
 
-                                                    // read from component level1.
-                                                    getImportService(componentFile, pathComponent, folder).then(result2 => {
-                                                        content = [...content, ...result2]
+                                                // read from component level1.
+                                                getImportService(componentFile, pathComponent, folder).then(result2 => {
+                                                    content = removeDuplicates([...content, ...result2]);
 
-                                                        if (index2 === matchComponent.length - 1) {
-                                                            readFile(pathComponent + '/' + componentFile).then((result3) => {
-                                                                const matchComponent1 = result3 ? result3.match(regex_component) : null;
+                                                    if (index2 === matchComponent.length - 1) {
+                                                        readFile(pathComponent + '/' + componentFile).then((result3) => {
+                                                            const matchComponent1 = result3 ? result3.match(regex_component) : null;
 
-                                                                if (folder === 'expense005')
-                                                                    console.log('matchComponent1: ', matchComponent1)
+                                                            if (matchComponent1) {
+                                                                matchComponent1.forEach((mComponent1, index3) => {
+                                                                    let pathComponent1 = mComponent1.substring(mComponent1.indexOf('\''), mComponent1.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
+                                                                    const componentFile1 = pathComponent1.substring(pathComponent1.lastIndexOf('/') + 1)
 
-                                                                if (matchComponent1) {
-                                                                    matchComponent1.forEach((mComponent1, index3) => {
-                                                                        let pathComponent1 = mComponent1.substring(mComponent1.indexOf('\''), mComponent1.lastIndexOf('\'')).replace('\'', '').replace('./', '/')
-                                                                        const componentFile1 = pathComponent1.substring(pathComponent1.lastIndexOf('/') + 1)
+                                                                    if (pathComponent1.match(/@/)) {
+                                                                        pathComponent1 = pathComponent1.replace('@/', base_url)
+                                                                    } else {
+                                                                        pathComponent1 = directory + '/' + pathComponent1
+                                                                    }
 
-                                                                        if (pathComponent1.match(/@/)) {
-                                                                            pathComponent1 = pathComponent1.replace('@/', base_url)
-                                                                        } else {
-                                                                            pathComponent1 = directory + '/' + pathComponent1
+                                                                    pathComponent1 = pathComponent1.substring(0, pathComponent1.lastIndexOf('/'))
+
+                                                                    // read from component level2.
+                                                                    getImportService(componentFile1, pathComponent1, folder).then(result4 => {
+                                                                        content = removeDuplicates([...content, ...result4]);
+
+                                                                        if (index3 === matchComponent1.length - 1) {
+                                                                            // read from IndexView.vue
+                                                                            getImportService(file, directory, folder).then(result5 => {
+                                                                                content = [...content, ...result5]
+
+                                                                                resolve(filterUrl(content))
+                                                                            })
                                                                         }
-
-                                                                        pathComponent1 = pathComponent1.substring(0, pathComponent1.lastIndexOf('/'))
-
-                                                                        // read from component level2.
-                                                                        getImportService(componentFile1, pathComponent1, folder).then(result4 => {
-                                                                            content = [...content, ...result4]
-
-                                                                            if (index3 === matchComponent1.length - 1) {
-                                                                                // read from IndexView.vue
-                                                                                getImportService(file, directory, folder).then(result5 => {
-                                                                                    content = [...content, ...result5]
-
-                                                                                    resolve(filterUrl(content))
-                                                                                })
-                                                                            }
-                                                                        })
                                                                     })
-                                                                } else {
-                                                                    // read from IndexView.vue
-                                                                    getImportService(file, directory, folder).then(result4 => {
-                                                                        content = [...content, ...result4]
+                                                                })
+                                                            } else {
+                                                                // read from IndexView.vue
+                                                                getImportService(file, directory, folder).then(result4 => {
+                                                                    content = removeDuplicates([...content, ...result4]);
 
+                                                                    if (index1 === matchFiles.length - 1) {
                                                                         resolve(filterUrl(content))
-                                                                    })
-                                                                }
-                                                            })
-                                                        }
-                                                    })
+                                                                    }
+                                                                })
+                                                            }
+                                                        })
+                                                    }
                                                 })
-                                            } else {
-                                                // read from IndexView.vue
-                                                getImportService(file, directory, folder).then(result3 => {
-                                                    content = [...content, ...result3]
+                                            })
+                                        } else {
+                                            // read from IndexView.vue
+                                            getImportService(file, directory, folder).then(result3 => {
+                                                content = removeDuplicates([...content, ...result3]);
 
+                                                if (index1 === matchFiles.length - 1) {
                                                     resolve(filterUrl(content))
-                                                })
-                                            }
-                                        })
-                                    }
+                                                }
+                                            })
+                                        }
+                                    })
                                 })
                             })
                         }
@@ -178,14 +175,20 @@ const getImportService = (file, directory = directoryPath, folder) => {
     let content = []
     return new Promise((resolve) => {
         readFile(directory + '/' + file).then((result) => {
-            const match = result ? result.match(regex_service) : null;
+            let match = result ? result.match(regex_service) : null;
 
             if (match && match.length > 0) {
-                // convert to object and groupBy fileName.
-                convertServiceToObject(match, file, result, folder).then(list => {
-                    content = [...content, ...list];
-                    
-                    resolve(filterUrl(content))
+                match = match.filter(f => f.indexOf('DateService') === -1)
+                match.forEach((m, index) => {
+                    setTimeout(() => {
+                        // convert to object and groupBy fileName.
+                        convertServiceToObject(m, file, result, folder).then(list => {
+                            content = [...content, ...list];
+
+                            if (index === match.length - 1)
+                                resolve(filterUrl(content))
+                        })
+                    }, 500)
                 })
             } else {
                 resolve(filterUrl(content))
@@ -195,40 +198,40 @@ const getImportService = (file, directory = directoryPath, folder) => {
 }
 
 // build struct service.
-const convertServiceToObject = (list, fileName, content, folder) => {
-    let result = []
+const convertServiceToObject = (matchConvert, fileName, content, folder) => {
+    let result = [];
 
     return new Promise((resolve) => {
-        list.forEach((obj, index) => {
-            const serviceList = obj.substring(obj.indexOf('{') + 1, obj.indexOf('}')).split(', ')
-            const path = obj.substring(obj.indexOf('\'')).replace(/\'/g, '').replace('@/', base_url)
+        // list.forEach((obj, index) => {
+        const service = matchConvert.substring(matchConvert.indexOf('{') + 1, matchConvert.indexOf('}'))
+        const path = matchConvert.substring(matchConvert.indexOf('\'')).replace(/\'/g, '').replace('@/', base_url)
 
-            serviceList.forEach(service => {
-                let serviceName = []
-                const s = service.replace(/ /g, '')
-                const regex = new RegExp('const \\w+ = new ' + s, 'g')
-                const match = content.match(regex)
+        // serviceList.forEach(service => {
+        let serviceName = []
+        const s = service.replace(/ /g, '')
+        const regex = new RegExp('const \\w+ = new ' + s, 'g')
+        const match = content.match(regex)
 
-                if (match && match.length > 0) {
-                    const sName = getServiceVariable(match[0]).replace(/ /g, '')
-                    const regex1 = new RegExp('(' + sName + '.\\w+)', 'g')
-                    const regexRm = new RegExp(sName + '.', 'g')
-                    const match1 = content.match(regex1)
-                    serviceName = match1 ? removeDuplicates(match1).map(m => m.replace(regexRm, '')) : [];
-                }
+        if (match && match.length > 0) {
+            const sName = getServiceVariable(match[0]).replace(/ /g, '')
+            const regex1 = new RegExp('(' + sName + '.\\w+)', 'g')
+            const regexRm = new RegExp(sName + '.', 'g')
+            const match1 = content.match(regex1)
+            serviceName = match1 ? removeDuplicates(match1).map(m => m.replace(regexRm, '')) : [];
+        }
 
-                const obj = { folder: (folder || ''), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
+        const objReturn = { folder: (folder || ''), service: s, path, fileName, serviceName: serviceName.join(', '), serviceNames: serviceName }
 
-                getServiceUrl(obj).then((data) => {
-                    result.push({ folder: data.folder, url: data.serviceName, fileName: data.fileName })
+        getServiceUrl(objReturn).then((data) => {
+            result.push({ folder: data.folder, url: data.serviceName, fileName: data.fileName })
 
-                    if (index === list.length - 1) {
-                        resolve(result)
-                    }
-                })
-            })
-
+            resolve(result)
+            // if (index === list.length - 1) {
+            // }
         })
+        // })
+
+        // })
     })
 }
 
@@ -262,23 +265,21 @@ const getServiceUrl = (obj) => {
         readFile((obj.path + '/' + fileName.replace(folderName.replace('-service', ''), folderName)) + '.service.ts').then((result) => {
 
             serviceNames.forEach((s, index) => {
-                if (folderName !== 'date') {
-                    const regex = new RegExp('public ' + s + '(.*\\s*.*\\s*.*`)')
+                const regex = new RegExp('public ' + s + '(.*\\s*.*\\s*.*`)')
 
-                    const match = result ? result.match(regex) : []
+                const match = result ? result.match(regex) : []
 
-                    if (match && match.length > 0) {
-                        const url = match[0]
-                        const urlName = url.substring(url.indexOf('/') + 1, url.lastIndexOf('`'))
+                if (match && match.length > 0) {
+                    const url = match[0]
+                    const urlName = url.substring(url.indexOf('/') + 1, url.lastIndexOf('`'))
 
-                        _serviceNames.push(_path + '/' + urlName.replace(/(\?).*/g, ''))
-                    }
+                    _serviceNames.push(_path + '/' + urlName.replace(/(\?).*/g, ''))
+                }
 
-                    if (index === serviceNames.length - 1) {
-                        obj.serviceName = _serviceNames.join(' , ')
+                if (index === serviceNames.length - 1) {
+                    obj.serviceName = _serviceNames.join(' , ')
 
-                        resolve(obj)
-                    }
+                    resolve(obj)
                 }
             })
         })

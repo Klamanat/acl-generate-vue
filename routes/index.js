@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 const { readDirectory, readFile } = require('../utils/file')
-const { getImportService, getSubImportService, groupBy } = require('../utils/common');
+const { getImportService, getSubImportService, groupBy, removeDuplicates } = require('../utils/common');
 const xl = require('excel4node');
 
 const directoryPath = 'D:/ELAAS/elaas/src/views/app/expense';
@@ -18,7 +18,7 @@ router.get('/', async function (req, res, next) {
         })
       } else if (file.indexOf('.vue') === -1) {
         // find in folder.
-        const _directory = directoryPath + '/' + file
+        const _directory = directoryPath + '/' + file;
         getSubImportService(file, _directory).then(result => {
           data.push(...result)
         })
@@ -35,24 +35,27 @@ router.get('/', async function (req, res, next) {
 
       for (const key in obj) {
         const list = obj[key]
-
-        if (key === 'expense005')
-          console.log('key: ', key)
+        let serviceGroup = [];
 
         list.forEach(item => {
           const listService = item.url.split(', ')
 
           listService.forEach(url => {
-            ws.cell(index, 1).string(key);
-            ws.cell(index, 2).string(url);
+            if (!serviceGroup.includes(url)) {
+              ws.cell(index, 1).string(key);
+              ws.cell(index, 2).string(url);
 
-            index++
+              index++
+            }
           })
+
+          serviceGroup = [...serviceGroup, ...listService]
         })
       }
       wb.write('myfirstexcel.xlsx');
+      // console.log(removeDuplicates(data))
       res.render('index', { title: 'ACL Generate', data: groupBy(data, 'folder') })
-    }, 15000)
+    }, 10000)
   })
 });
 
